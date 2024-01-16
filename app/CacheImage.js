@@ -1,9 +1,10 @@
-import React,{Component} from 'react';
-import {Image, ActivityIndicator, Platform, View} from 'react-native';
-import RNFS, { DocumentDirectoryPath,ExternalDirectoryPath } from 'react-native-fs';
+import React, { Component } from 'react';
+import { Image, ActivityIndicator, Platform, View } from 'react-native';
+import RNFS, { DocumentDirectoryPath, ExternalDirectoryPath } from 'react-native-fs';
 import Loading from './components/Loading';
-import {getBaseUri} from './middleware/bff';
+import { getBaseUri, getCookie, ossPath } from './middleware/bff';
 import RNFetchBlob from 'react-native-fetch-blob'
+import Colors from "../../../app/utils/const/Colors";
 
 const dirPath = Platform.OS === 'ios' ? DocumentDirectoryPath : ExternalDirectoryPath
 const pathPre = Platform.OS === 'ios' ? '' : 'file://';
@@ -46,19 +47,19 @@ export default class CacheImage extends Component {
   }
 
   async checkImageCache(cacheKey) {
-    const filePath = dirPath+'/'+cacheKey;
+    const filePath = dirPath + '/' + cacheKey;
     RNFS.exists(filePath)
       .then((res) => {
         if (res) {
-          this.setState({cacheable: true, cachedImagePath: filePath});
-          if(this.props.onLoad) this.props.onLoad();
+          this.setState({ cacheable: true, cachedImagePath: filePath });
+          if (this.props.onLoad) this.props.onLoad();
         }
         else {
           throw Error("CacheableImage: Invalid file in checkImageCache()");
         }
       })
       .catch((err) => {
-        RNFS.mkdir(dirPath, {NSURLIsExcludedFromBackupKey: true})
+        RNFS.mkdir(dirPath, { NSURLIsExcludedFromBackupKey: true })
           .then(() => {
             if (this.state.cacheable && this.state.cachedImagePath) {
               let delImagePath = this.state.cachedImagePath;
@@ -67,30 +68,38 @@ export default class CacheImage extends Component {
             if (this.jobId) {
               this._stopDownload();
             }
-            RNFetchBlob
-              .config({
-                fileCache : true,
-                path:filePath
-              })
-              .fetch('GET', getBaseUri()+'document/get?id='+cacheKey, {
-                //some headers ..
-              })
+
+            let downUrl = getBaseUri() + ossPath + cacheKey;
+            // var headers={};
+            // headers[TOKENHEADER]=token;
+            // headers[HEADERDEVICEID]=deviceid;
+            // let encodeImageUri = encodeURI(imageUri);
+            let downloadOptions = {
+              fromUrl: downUrl,
+              toFile: filePath,
+              headers: {
+                Cookie: getCookie()
+              }
+            };
+            RNFS.downloadFile(downloadOptions).promise
               .then((res) => {
+                // console.log('res', res, downloadOptions)
                 // the temp file path
-                if(res.respInfo.status === 200) {
+                if (res.statusCode === 200) {
                   //成功了
-                  if(this.props.onLoad) this.props.onLoad();
-                  this.setState({cacheable: true, cachedImagePath: filePath});
-                }else {
+                  if (this.props.onLoad) this.props.onLoad();
+                  this.setState({ cacheable: true, cachedImagePath: filePath });
+                } else {
                   //失败了,删除缓存文件
                   this._deleteFilePath(filePath);
-                  this.setState({cacheable: false, cachedImagePath: null});
+                  this.setState({ cacheable: false, cachedImagePath: null });
                 }
               });
           })
           .catch((err) => {
+            console.log('err', err, downloadOptions)
             this._deleteFilePath(filePath);
-            this.setState({cacheable: false, cachedImagePath: null});
+            this.setState({ cacheable: false, cachedImagePath: null });
           });
       });
   }
@@ -101,7 +110,7 @@ export default class CacheImage extends Component {
         if (res) {
           RNFS
             .unlink(filePath)
-            .catch((err) => {console.warn('error _deleteFilePath...',err);});
+            .catch((err) => { console.warn('error _deleteFilePath...', err); });
         }
       });
   }
@@ -117,21 +126,34 @@ export default class CacheImage extends Component {
     this.checkImageCache(this.props.imageKey).then();
   }
 
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.imageKey !== this.props.imageKey && nextProps.imageKey) {
+      this.checkImageCache(nextProps.imageKey).then();
+    }
+  }
+
   componentWillUnmount() {
 
   }
 
   render() {
-    if(this.state.cacheable && this.state.cachedImagePath) {
+    if (this.state.cacheable && this.state.cachedImagePath) {
       //说明本地有缓存文件
       return (
-        <View style={{borderWidth:this.props.borderWidth||0,borderColor:'#f2f2f2',borderRadius:2,marginRight:this.props.space || 0,marginTop:this.props.space || 0}}>
-          <Image resizeMode={this.props.mode || 'cover'} source={{uri:pathPre+this.state.cachedImagePath}} style={{width:this.props.width,height:this.props.height}}/>
+        <View style={{ borderWidth: this.props.borderWidth || 0, borderColor: Colors.seBorderSplit, borderRadius: 2, marginRight: this.props.space || 0, marginTop: this.props.space || 0 , overflow: 'hidden' }}>
+          <Image resizeMode={this.props.mode || 'cover'} source={{ uri: pathPre + this.state.cachedImagePath }} style={{ width: this.props.width, height: this.props.height }} />
+        </View>
+      )
+    }
+    if (!this.props.cacheKey) {
+      return (
+        <View style={{ borderWidth: this.props.borderWidth || 0, borderColor: Colors.seBorderSplit, borderRadius: 2, marginRight: this.props.space || 0, marginTop: this.props.space || 0, overflow: 'hidden'  }}>
+          <Image resizeMode={this.props.mode || 'cover'} source={this.props.defaultImgPath} style={{ width: this.props.width, height: this.props.height }} />
         </View>
       )
     }
     return (
-      <View style={{width:this.props.width,height:this.props.height}}>
+      <View style={{ width: this.props.width, height: this.props.height }}>
         <Loading />
       </View>
 

@@ -28,6 +28,7 @@ import CacheImage from "./CacheImage";
 import {localStr} from "./utils/Localizations/localization";
 import PhotoShowView from "./components/assets/PhotoShowView";
 import Loading from './components/Loading';
+import SndAlert from "../../../app/utils/components/SndAlert";
 
 const CODE_OK = '0'
 
@@ -58,14 +59,14 @@ export default class LogEditView extends Component{
     return this.props.checkAuth();
   }
   _openImagePicker(){
-    this.props.navigator.push({
+    this.props.navigation.push('PageWarpper',{
       id:'imagePicker',
       component:ImagePicker,
       passProps:{
         max:20-this.state.log.pictures.length,
-        onBack:()=>this.props.navigator.pop(),
+        onBack:()=>this.props.navigation.pop(),
         done:(data)=>{
-          this.props.navigator.pop();
+          this.props.navigation.pop();
           let log = this.state.log;
           log.pictures = log.pictures.concat(data)
           this.setState({log})
@@ -126,20 +127,20 @@ export default class LogEditView extends Component{
 
   _goToDetail(index){
     //查看照片详情
-    this.props.navigator.push({
+    this.props.navigation.push('PageWarpper',{
       id:'ticket_log_edit',
       component:PhotoShowView,
       passProps:{
         index:index,
-        onBack:()=>this.props.navigator.pop(),
+        onBack:()=>this.props.navigation.pop(),
         data:this.state.log.pictures
       }
     })
   }
   _deleteImage(item,index){
-    Alert.alert(
-      '',
+    SndAlert.alert(
       localStr('lang_ticket_log_del_img_confirm'),
+      '',
       [
         {text: localStr('lang_ticket_filter_cancel'), onPress: () => console.log('Cancel Pressed'), style: 'cancel'},
         {text: localStr('lang_ticket_log_del_ok'), onPress: async () => {
@@ -172,7 +173,7 @@ export default class LogEditView extends Component{
         this.props.callBack();
       }else {
         //失败了
-        Alert.alert(localStr('lang_alert_title'),res.msg)
+        SndAlert.alert(localStr('lang_alert_title'),res.msg)
       }
     });
   }
